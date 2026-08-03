@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SETLOG</title>
+<link rel="stylesheet" href="css/styles.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- ============ AUTH SCREEN ============ -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <div class="wordmark">SET<span class="accent">LOG</span></div>
+      <p class="tagline">Lifting, tracked. Muscles, mapped.</p>
+      <button id="sign-in-btn" class="btn primary">Sign in with Google</button>
+      <p class="muted small">Your data syncs privately to your account only.</p>
+    </div>
+  </div>
+
+  <!-- ============ APP SHELL ============ -->
+  <div id="app-shell" class="app-shell hidden">
+
+    <header class="app-header">
+      <div class="wordmark small">SET<span class="accent">LOG</span></div>
+      <div class="header-right">
+        <span id="user-email" class="muted small"></span>
+        <button id="sign-out-btn" class="icon-btn" aria-label="Sign out">⎋</button>
+      </div>
+    </header>
+
+    <main class="tab-content">
+
+      <!-- ---------- LOG TAB ---------- -->
+      <section id="tab-log" class="tab-panel active">
+        <h2 class="panel-title">Log a session</h2>
+
+        <label class="field-label">Date</label>
+        <input type="date" id="log-date" class="field" />
+
+        <label class="field-label">Cycle phase (optional)</label>
+        <select id="cycle-phase" class="field">
+          <option value="">Not tracking</option>
+          <option value="menstrual">Menstrual</option>
+          <option value="follicular">Follicular</option>
+          <option value="ovulation">Ovulation</option>
+          <option value="luteal">Luteal</option>
+        </select>
+
+        <div class="add-set-card">
+          <label class="field-label">Exercise</label>
+          <input list="exercise-list" id="exercise-input" class="field" placeholder="e.g. Barbell Bench Press" />
+          <datalist id="exercise-list"></datalist>
+
+          <div class="set-input-row">
+            <div>
+              <label class="field-label">Weight</label>
+              <div class="weight-input-group">
+                <input type="number" id="weight-input" class="field" step="0.5" min="0" />
+                <select id="unit-select" class="field unit-select">
+                  <option value="kg">kg</option>
+                  <option value="lb">lb</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="field-label">Reps</label>
+              <input type="number" id="reps-input" class="field" min="0" />
+            </div>
+            <div>
+              <label class="field-label">Partial reps</label>
+              <input type="number" id="partial-input" class="field" min="0" placeholder="0" />
+            </div>
+          </div>
+          <button id="add-set-btn" class="btn">+ Add set</button>
+        </div>
+
+        <h3 class="section-label">Sets logged today</h3>
+        <div id="draft-sets-list"></div>
+
+        <button id="save-session-btn" class="btn primary full-width">Save session</button>
+      </section>
+
+      <!-- ---------- CALENDAR TAB ---------- -->
+      <section id="tab-calendar" class="tab-panel">
+        <div class="calendar-header">
+          <button id="cal-prev" class="icon-btn">‹</button>
+          <span id="calendar-month-label" class="panel-title"></span>
+          <button id="cal-next" class="icon-btn">›</button>
+        </div>
+        <div class="cal-weekday-row">
+          <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
+        </div>
+        <div id="calendar-grid" class="cal-grid"></div>
+        <div id="calendar-detail" class="calendar-detail"></div>
+      </section>
+
+      <!-- ---------- MUSCLES TAB ---------- -->
+      <section id="tab-muscles" class="tab-panel">
+        <h2 class="panel-title">Muscles worked</h2>
+        <div class="segmented">
+          <label><input type="radio" name="muscle-range" value="today" checked /> <span>Today</span></label>
+          <label><input type="radio" name="muscle-range" value="week" /> <span>This week</span></label>
+        </div>
+        <div id="muscles-diagram"></div>
+        <div id="untouched-list" class="untouched-block"></div>
+      </section>
+
+      <!-- ---------- PROGRESS TAB ---------- -->
+      <section id="tab-progress" class="tab-panel">
+        <h2 class="panel-title">Progress & recommendations</h2>
+        <div id="progress-list"></div>
+      </section>
+
+      <!-- ---------- RUNNING TAB (placeholder) ---------- -->
+      <section id="tab-running" class="tab-panel">
+        <h2 class="panel-title">Running</h2>
+        <div class="placeholder-block">
+          <p>Cardio tracking is coming next — pace, distance, and route logging.</p>
+          <p class="muted small">For now, keep using your current method for runs.</p>
+        </div>
+      </section>
+
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="tab-btn active" data-tab="log">Log</button>
+      <button class="tab-btn" data-tab="calendar">Calendar</button>
+      <button class="tab-btn" data-tab="muscles">Muscles</button>
+      <button class="tab-btn" data-tab="progress">Progress</button>
+      <button class="tab-btn" data-tab="running">Running</button>
+    </nav>
+  </div>
+
+  <!-- ============ NEW EXERCISE MODAL ============ -->
+  <div id="new-ex-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3>Add "<span id="new-ex-name"></span>" to the exercise database</h3>
+      <p class="muted small">Which muscles does it target? (used for the heat map)</p>
+      <div id="muscle-checkboxes" class="muscle-checkbox-grid"></div>
+      <div class="modal-actions">
+        <button id="new-ex-cancel" class="btn">Cancel</button>
+        <button id="new-ex-save" class="btn primary">Save exercise</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase (compat SDK — no build step required) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/exercise-db.js"></script>
+  <script src="js/muscle-diagram.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
