@@ -3,6 +3,7 @@ const $$ = (sel, el = document) => Array.from(el.querySelectorAll(sel));
 
 let draftSets = [];
 let draftDate = todayStr();
+let draftEditingId = null; // set only when editing an existing session via Calendar
 let calendarMonth = new Date();
 let calendarSelectedDate = null;
 
@@ -49,11 +50,6 @@ $$(".tab-btn").forEach((btn) => {
 // ---------------------------------------------------------------------------
 function renderLogTab() {
   $("#log-date").value = draftDate;
-  const existing = Store.getSessionByDate(draftDate)[0];
-  if (existing && draftSets.length === 0) {
-    draftSets = existing.sets.map((s) => ({ ...s }));
-    $("#cycle-phase").value = existing.cyclePhase || "";
-  }
   populateExerciseOptions();
   renderDraftSetsList();
 }
@@ -69,6 +65,8 @@ function populateExerciseOptions() {
 $("#log-date").addEventListener("change", (e) => {
   draftDate = e.target.value;
   draftSets = [];
+  draftEditingId = null;
+  $("#cycle-phase").value = "";
   renderLogTab();
 });
 
@@ -125,16 +123,29 @@ function renderDraftSetsList() {
 $("#save-session-btn").addEventListener("click", async () => {
   if (draftSets.length === 0) return alert("Add at least one set first.");
   const cyclePhase = $("#cycle-phase").value;
-  const existing = Store.getSessionByDate(draftDate)[0];
-  const payload = { date: draftDate, cyclePhase, sets: draftSets, updatedAt: Date.now() };
-  if (existing) {
-    await Store.updateSession(existing.id, payload);
+
+  if (draftEditingId) {
+    // Explicit edit (came from Calendar -> Edit): replace the session's sets outright.
+    await Store.updateSession(draftEditingId, { date: draftDate, cyclePhase, sets: draftSets, updatedAt: Date.now() });
   } else {
-    payload.createdAt = Date.now();
-    await Store.addSession(payload);
+    const existing = Store.getSessionByDate(draftDate)[0];
+    if (existing) {
+      // Already logged something today - append rather than clobber earlier sets.
+      await Store.updateSession(existing.id, {
+        cyclePhase: cyclePhase || existing.cyclePhase,
+        sets: [...existing.sets, ...draftSets],
+        updatedAt: Date.now(),
+      });
+    } else {
+      await Store.addSession({ date: draftDate, cyclePhase, sets: draftSets, createdAt: Date.now(), updatedAt: Date.now() });
+    }
   }
-  alert("Session saved.");
+
+  // Reset the form for the next entry.
   draftSets = [];
+  draftEditingId = null;
+  draftDate = todayStr();
+  $("#cycle-phase").value = "";
   refreshEverything();
 });
 
@@ -149,8 +160,9 @@ $("#new-ex-cancel").addEventListener("click", () => $("#new-ex-modal").classList
 $("#new-ex-save").addEventListener("click", async () => {
   const name = $("#new-ex-modal").dataset.pendingName;
   const checked = $$('input[name="muscle"]:checked', $("#new-ex-modal")).map((cb) => cb.value);
+  const type = $('input[name="ex-type"]:checked', $("#new-ex-modal")).value;
   if (checked.length === 0) return alert("Pick at least one muscle.");
-  await Store.addCustomExercise(name, checked, []);
+  await Store.addCustomExercise(name, checked, [], type);
   $("#new-ex-modal").classList.add("hidden");
   $("#exercise-input").value = name;
   populateExerciseOptions();
@@ -213,6 +225,7 @@ function showCalendarDetail(dateStr) {
     $("#log-this-day").addEventListener("click", () => {
       draftDate = dateStr;
       draftSets = [];
+      draftEditingId = null;
       renderLogTab();
       $('.tab-btn[data-tab="log"]').click();
     });
@@ -238,7 +251,9 @@ function showCalendarDetail(dateStr) {
   $("#edit-this-day").addEventListener("click", () => {
     draftDate = dateStr;
     draftSets = session.sets.map((s) => ({ ...s }));
+    draftEditingId = session.id;
     renderLogTab();
+    $("#cycle-phase").value = session.cyclePhase || "";
     $('.tab-btn[data-tab="log"]').click();
   });
   $("#delete-this-day").addEventListener("click", async () => {
@@ -255,7 +270,7 @@ function renderMusclesTab() {
   const mode = $('input[name="muscle-range"]:checked').value;
   let sets = [];
   if (mode === "today") {
-    const s = Store.getSessionByDate(todayStr())[0] || Store.getSessions()[0];
+    const s = Store.getSessionByDate(todayStr())[0];
     sets = s ? s.sets : [];
   } else {
     Store.getSessionsThisWeek().forEach((s) => sets.push(...s.sets));
@@ -263,17 +278,64 @@ function renderMusclesTab() {
   const intensity = computeIntensityMap(sets);
   renderMuscleDiagram($("#muscles-diagram"), intensity);
 
-  const untouched = untouchedMusclesThisWeek(computeIntensityMapForWeek());
-  $("#untouched-list").innerHTML =
-    untouched.length === 0
-      ? `<p class="empty-hint">Every muscle group has been hit this week 🎉</p>`
-      : `<p class="muted">Not yet targeted this week:</p><div class="chip-row">${untouched.map((id) => `<span class="chip">${MUSCLE_GROUPS[id].label}</span>`).join("")}</div>`;
+  if (mode === "today" && sets.length === 0) {
+    $("#muscles-diagram").insertAdjacentHTML("beforeend", `<p class="empty-hint">No session logged today yet.</p>`);
+  }
+
+  renderWeeklyVolumeTargets();
 }
 
 function computeIntensityMapForWeek() {
   const sets = [];
   Store.getSessionsThisWeek().forEach((s) => sets.push(...s.sets));
   return computeIntensityMap(sets);
+}
+
+const SET_STATUS_LABEL = {
+  none: "Not trained this week",
+  low: "Below effective range",
+  building: "Building toward target",
+  optimal: "In the research-backed sweet spot",
+  high: "Very high — watch recovery",
+};
+
+function renderWeeklyVolumeTargets() {
+  const sets = [];
+  Store.getSessionsThisWeek().forEach((s) => sets.push(...s.sets));
+  const counts = computeWeeklySetCounts(sets);
+
+  const sections = MUSCLE_REGIONS.map((region) => {
+    const muscleIds = Object.keys(MUSCLE_GROUPS).filter((id) => MUSCLE_GROUPS[id].region === region);
+    const rows = muscleIds
+      .sort((a, b) => counts[a] - counts[b])
+      .map((id) => {
+        const count = counts[id];
+        const status = classifySetCount(count);
+        const rounded = Math.round(count * 2) / 2;
+        let suggestion = "";
+        if (status === "none" || status === "low" || status === "building") {
+          const { compound, isolation } = getExercisesForMuscle(id);
+          const picks = [compound[0], isolation[0]].filter(Boolean);
+          if (picks.length) suggestion = `<div class="volume-suggestion">Try: ${picks.join(" + ")}</div>`;
+        }
+        return `
+          <div class="volume-row status-${status}">
+            <span class="volume-label">${MUSCLE_GROUPS[id].label}</span>
+            <span class="volume-count">${rounded} sets</span>
+            <span class="volume-status">${SET_STATUS_LABEL[status]}</span>
+            ${suggestion}
+          </div>`;
+      })
+      .join("");
+    return `<div class="region-block"><h4 class="region-header">${REGION_LABELS[region]}</h4>${rows}</div>`;
+  }).join("");
+
+  $("#untouched-list").innerHTML = `
+    <p class="muted small">Research-backed target: ~10–20 hard sets per muscle per week
+      (Schoenfeld et al., 2017). Secondary/assisting muscles count as half a set.
+      Suggestions mix one compound + one isolation move to help manage energy across a session.</p>
+    ${sections}
+  `;
 }
 
 $$('input[name="muscle-range"]').forEach((r) => r.addEventListener("change", renderMusclesTab));
@@ -286,6 +348,87 @@ function topSet(sets) {
 }
 
 function renderProgressTab() {
+  renderStrengthChart();
+  renderExerciseRecommendations();
+}
+
+// --- Strength trend chart -------------------------------------------------
+let strengthChartInstance = null;
+
+function estOneRM(set) {
+  const effectiveReps = (set.reps || 0) + (set.partialReps || 0) * 0.4;
+  return (set.weight || 0) * (1 + effectiveReps / 30); // Epley formula
+}
+
+function computeStrengthTrend(region) {
+  const sessions = Store.getSessions().slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  const regionMuscles = region === "overall" ? null : Object.keys(MUSCLE_GROUPS).filter((id) => MUSCLE_GROUPS[id].region === region);
+
+  const labels = [];
+  const data = [];
+  sessions.forEach((session) => {
+    const relevantSets = session.sets.filter((set) => {
+      if (!regionMuscles) return true;
+      const { primary } = getMuscleContribution(set.exercise);
+      return primary.some((m) => regionMuscles.includes(m));
+    });
+    if (relevantSets.length === 0) return;
+
+    const topByExercise = {};
+    relevantSets.forEach((set) => {
+      const e1rm = estOneRM(set);
+      if (!topByExercise[set.exercise] || e1rm > topByExercise[set.exercise]) topByExercise[set.exercise] = e1rm;
+    });
+    const values = Object.values(topByExercise);
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    labels.push(session.date);
+    data.push(Math.round(avg * 10) / 10);
+  });
+  return { labels, data };
+}
+
+function renderStrengthChart() {
+  const region = $('input[name="strength-region"]:checked').value;
+  const { labels, data } = computeStrengthTrend(region);
+
+  $("#strength-chart-empty").classList.toggle("hidden", labels.length > 0);
+  if (labels.length === 0) {
+    if (strengthChartInstance) strengthChartInstance.destroy();
+    strengthChartInstance = null;
+    return;
+  }
+
+  const ctx = $("#strength-chart").getContext("2d");
+  if (strengthChartInstance) strengthChartInstance.destroy();
+  strengthChartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Est. 1RM (avg of top sets)",
+        data,
+        borderColor: "#ff5a1f",
+        backgroundColor: "rgba(255,90,31,0.15)",
+        tension: 0.25,
+        fill: true,
+        pointRadius: 3,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#a89f95" }, grid: { color: "#3a332c" } },
+        y: { ticks: { color: "#a89f95" }, grid: { color: "#3a332c" }, title: { display: true, text: "kg (est.)", color: "#a89f95" } },
+      },
+    },
+  });
+}
+
+$$('input[name="strength-region"]').forEach((r) => r.addEventListener("change", renderStrengthChart));
+
+// --- Per-exercise progression recommendations -----------------------------
+function renderExerciseRecommendations() {
   const sessions = Store.getSessions();
   const exercisesSeen = new Set();
   sessions.forEach((s) => s.sets.forEach((set) => exercisesSeen.add(set.exercise)));

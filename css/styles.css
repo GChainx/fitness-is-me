@@ -1,3 +1,5 @@
+
+Styles · CSS
 :root {
   --bg: #14100f;
   --surface: #1c1815;
@@ -11,14 +13,14 @@
   --success: #7cd992;
   --danger: #ff6b5e;
   --muscle-off: #3a332c;
-
+ 
   --font-display: "Oswald", sans-serif;
   --font-body: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 }
-
+ 
 * { box-sizing: border-box; }
-
+ 
 html, body {
   margin: 0;
   padding: 0;
@@ -27,11 +29,11 @@ html, body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
-
+ 
 .hidden { display: none !important; }
 .muted { color: var(--text-dim); }
 .small { font-size: 0.8rem; }
-
+ 
 .wordmark {
   font-family: var(--font-display);
   font-weight: 700;
@@ -41,7 +43,7 @@ html, body {
 }
 .wordmark.small { font-size: 1.3rem; }
 .wordmark .accent { color: var(--accent); }
-
+ 
 /* ---------------- AUTH SCREEN ---------------- */
 .auth-screen {
   min-height: 100vh;
@@ -63,7 +65,7 @@ html, body {
   margin: 8px 0 28px;
   font-size: 0.95rem;
 }
-
+ 
 /* ---------------- BUTTONS / FIELDS ---------------- */
 .btn {
   font-family: var(--font-body);
@@ -84,7 +86,7 @@ html, body {
 }
 .btn.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
 .btn.full-width { width: 100%; margin-top: 16px; }
-
+ 
 .icon-btn {
   background: transparent;
   border: none;
@@ -94,7 +96,7 @@ html, body {
   padding: 6px 10px;
 }
 .icon-btn.danger { color: var(--danger); }
-
+ 
 .field {
   width: 100%;
   background: var(--surface-2);
@@ -114,10 +116,10 @@ html, body {
   color: var(--text-dim);
   margin-bottom: 4px;
 }
-
+ 
 /* ---------------- APP SHELL ---------------- */
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
-
+ 
 .app-header {
   display: flex;
   align-items: center;
@@ -130,7 +132,7 @@ html, body {
   z-index: 5;
 }
 .header-right { display: flex; align-items: center; gap: 8px; }
-
+ 
 .tab-content {
   flex: 1;
   padding: 16px 16px 90px;
@@ -138,11 +140,11 @@ html, body {
   width: 100%;
   margin: 0 auto;
 }
-
+ 
 .tab-panel { display: none; }
 .tab-panel.active { display: block; animation: fadeIn 0.15s ease; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
+ 
 .panel-title {
   font-family: var(--font-display);
   font-weight: 600;
@@ -159,7 +161,7 @@ html, body {
   letter-spacing: 0.05em;
   margin: 20px 0 8px;
 }
-
+ 
 .bottom-nav {
   position: fixed;
   bottom: 0; left: 0; right: 0;
@@ -183,7 +185,7 @@ html, body {
   border-radius: 8px;
 }
 .tab-btn.active { color: var(--accent); background: rgba(255,90,31,0.1); }
-
+ 
 /* ---------------- LOG TAB ---------------- */
 .add-set-card {
   background: var(--surface);
@@ -200,7 +202,7 @@ html, body {
 .weight-input-group { display: flex; gap: 6px; }
 .weight-input-group .field:first-child { flex: 1; }
 .unit-select { width: 62px; flex: none; }
-
+ 
 .set-row {
   display: flex;
   align-items: center;
@@ -214,7 +216,7 @@ html, body {
 .set-row-main { display: flex; flex-direction: column; gap: 2px; }
 .set-row-detail { font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-dim); }
 .empty-hint { color: var(--text-dim); font-size: 0.9rem; }
-
+ 
 /* ---------------- CALENDAR ---------------- */
 .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .cal-weekday-row {
@@ -256,7 +258,7 @@ html, body {
 }
 .detail-actions { display: flex; gap: 8px; margin-top: 12px; }
 .set-list-readonly { margin-top: 10px; }
-
+ 
 /* ---------------- MUSCLE DIAGRAM ---------------- */
 .diagram-pair {
   display: flex;
@@ -281,7 +283,7 @@ html, body {
   z-index: 50;
   display: none;
 }
-
+ 
 .segmented {
   display: flex;
   gap: 8px;
@@ -299,17 +301,47 @@ html, body {
 }
 .segmented input { display: none; }
 .segmented label:has(input:checked) { border-color: var(--accent); color: var(--accent); }
-
+ 
 .untouched-block { margin-top: 20px; }
-.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.chip {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 4px 12px;
-  font-size: 0.8rem;
+.region-block { margin-bottom: 18px; }
+.region-header {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-2);
+  margin: 0 0 8px;
 }
-
+.volume-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.volume-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-dim);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+.volume-count { font-family: var(--font-mono); text-align: center; color: var(--text-dim); }
+.volume-status { text-align: right; font-size: 0.75rem; color: var(--text-dim); }
+.volume-suggestion {
+  grid-column: 1 / -1;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  border-top: 1px dashed var(--border);
+  padding-top: 4px;
+  margin-top: 2px;
+}
+.volume-row.status-none { border-left-color: var(--text-dim); opacity: 0.7; }
+.volume-row.status-low { border-left-color: var(--danger); }
+.volume-row.status-building { border-left-color: var(--accent-2); }
+.volume-row.status-optimal { border-left-color: var(--success); }
+.volume-row.status-high { border-left-color: var(--accent-cool); }
+ 
 /* ---------------- PROGRESS ---------------- */
 .reco-card {
   background: var(--surface);
@@ -324,7 +356,7 @@ html, body {
 .reco-card.tone-phase { border-left-color: var(--accent-cool); }
 .reco-header { display: flex; justify-content: space-between; margin-bottom: 4px; font-family: var(--font-display); }
 .reco-card p { margin: 0; font-size: 0.9rem; color: var(--text); }
-
+ 
 .placeholder-block {
   background: var(--surface);
   border: 1px dashed var(--border);
@@ -333,7 +365,15 @@ html, body {
   text-align: center;
   color: var(--text-dim);
 }
-
+.chart-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 10px 0 20px;
+  height: 220px;
+}
+ 
 /* ---------------- MODAL ---------------- */
 .modal {
   position: fixed;
@@ -366,7 +406,8 @@ html, body {
   padding: 6px;
 }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
-
+ 
 @media (min-width: 700px) {
   .bottom-nav { max-width: 640px; margin: 0 auto; border-radius: 12px 12px 0 0; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
 }
+ 

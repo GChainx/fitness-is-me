@@ -111,6 +111,23 @@
       <!-- ---------- PROGRESS TAB ---------- -->
       <section id="tab-progress" class="tab-panel">
         <h2 class="panel-title">Progress & recommendations</h2>
+
+        <h3 class="section-label">Strength trend</h3>
+        <div class="segmented" id="strength-region-tabs">
+          <label><input type="radio" name="strength-region" value="overall" checked /> <span>Overall</span></label>
+          <label><input type="radio" name="strength-region" value="chest" /> <span>Chest</span></label>
+          <label><input type="radio" name="strength-region" value="back" /> <span>Back</span></label>
+        </div>
+        <div class="segmented">
+          <label><input type="radio" name="strength-region" value="shoulders" /> <span>Shoulders</span></label>
+          <label><input type="radio" name="strength-region" value="arms" /> <span>Arms</span></label>
+          <label><input type="radio" name="strength-region" value="legs" /> <span>Legs</span></label>
+          <label><input type="radio" name="strength-region" value="core" /> <span>Core</span></label>
+        </div>
+        <div class="chart-wrap"><canvas id="strength-chart"></canvas></div>
+        <p id="strength-chart-empty" class="empty-hint hidden">Not enough sessions yet to chart a trend — keep logging.</p>
+
+        <h3 class="section-label">Exercise recommendations</h3>
         <div id="progress-list"></div>
       </section>
 
@@ -140,12 +157,20 @@
       <h3>Add "<span id="new-ex-name"></span>" to the exercise database</h3>
       <p class="muted small">Which muscles does it target? (used for the heat map)</p>
       <div id="muscle-checkboxes" class="muscle-checkbox-grid"></div>
+      <p class="muted small">Compound (multi-joint) or isolation (single-joint)?</p>
+      <div class="segmented">
+        <label><input type="radio" name="ex-type" value="compound" checked /> <span>Compound</span></label>
+        <label><input type="radio" name="ex-type" value="isolation" /> <span>Isolation</span></label>
+      </div>
       <div class="modal-actions">
         <button id="new-ex-cancel" class="btn">Cancel</button>
         <button id="new-ex-save" class="btn primary">Save exercise</button>
       </div>
     </div>
   </div>
+
+  <!-- Chart.js for the strength trend chart -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 
   <!-- Firebase (compat SDK — no build step required) -->
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
