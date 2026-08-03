@@ -1,5 +1,3 @@
-
-Muscle diagram · JS
 // ---------------------------------------------------------------------------
 // Builds a front + back body silhouette with overlaid muscle-group shapes.
 // renderMuscleDiagram(el, intensityMap) draws it; intensityMap is

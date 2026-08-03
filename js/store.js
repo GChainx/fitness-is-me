@@ -1,5 +1,3 @@
-
-Store · JS
 // Uses the Firebase compat SDK (loaded via <script> tags in index.html)
 // so this file can stay a plain script with no bundler required.
  
