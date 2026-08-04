@@ -11,6 +11,14 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function formatSetDetail(s) {
+  if (isTimedExercise(s.exercise)) {
+    const weightPart = s.weight ? `${s.weight}${s.unit} × ` : "";
+    return `${weightPart}${s.reps}s hold`;
+  }
+  return `${s.weight}${s.unit} × ${s.reps}${s.partialReps ? ` +${s.partialReps} partial` : ""}`;
+}
+
 // ---------------------------------------------------------------------------
 // AUTH / BOOT
 // ---------------------------------------------------------------------------
@@ -70,6 +78,13 @@ $("#log-date").addEventListener("change", (e) => {
   renderLogTab();
 });
 
+$("#exercise-input").addEventListener("input", (e) => {
+  const timed = isTimedExercise(e.target.value.trim());
+  $("#reps-label").textContent = timed ? "Seconds" : "Reps";
+  $("#partial-input-group").style.display = timed ? "none" : "";
+  if (timed) $("#partial-input").value = "";
+});
+
 $("#add-set-btn").addEventListener("click", () => {
   const exercise = $("#exercise-input").value.trim();
   const weight = parseFloat($("#weight-input").value);
@@ -106,7 +121,7 @@ function renderDraftSetsList() {
       <div class="set-row">
         <div class="set-row-main">
           <strong>${s.exercise}</strong>
-          <span class="set-row-detail">${s.weight}${s.unit} × ${s.reps}${s.partialReps ? ` +${s.partialReps} partial` : ""}</span>
+          <span class="set-row-detail">${formatSetDetail(s)}</span>
         </div>
         <button class="icon-btn danger" data-remove="${i}" aria-label="Remove set">✕</button>
       </div>`
@@ -240,7 +255,7 @@ function showCalendarDetail(dateStr) {
     </div>
     <div id="calendar-diagram"></div>
     <div class="set-list-readonly">
-      ${session.sets.map((s) => `<div class="set-row-detail">${s.exercise} — ${s.weight}${s.unit} × ${s.reps}${s.partialReps ? ` +${s.partialReps}p` : ""}</div>`).join("")}
+      ${session.sets.map((s) => `<div class="set-row-detail">${s.exercise} — ${formatSetDetail(s)}</div>`).join("")}
     </div>
     <div class="detail-actions">
       <button class="btn" id="edit-this-day">Edit</button>
@@ -275,7 +290,7 @@ function renderMusclesTab() {
   } else {
     Store.getSessionsThisWeek().forEach((s) => sets.push(...s.sets));
   }
-  const intensity = computeIntensityMap(sets);
+  const intensity = computeIntensityMap(sets, mode === "week" ? "absolute" : "relative");
   renderMuscleDiagram($("#muscles-diagram"), intensity);
 
   if (mode === "today" && sets.length === 0) {
@@ -283,12 +298,6 @@ function renderMusclesTab() {
   }
 
   renderWeeklyVolumeTargets();
-}
-
-function computeIntensityMapForWeek() {
-  const sets = [];
-  Store.getSessionsThisWeek().forEach((s) => sets.push(...s.sets));
-  return computeIntensityMap(sets);
 }
 
 const SET_STATUS_LABEL = {
@@ -343,8 +352,9 @@ $$('input[name="muscle-range"]').forEach((r) => r.addEventListener("change", ren
 // ---------------------------------------------------------------------------
 // PROGRESS TAB — recommendations
 // ---------------------------------------------------------------------------
-function topSet(sets) {
-  return sets.reduce((best, s) => (!best || s.weight > best.weight ? s : best), null);
+function topSet(sets, exerciseName) {
+  const byDuration = exerciseName && isTimedExercise(exerciseName);
+  return sets.reduce((best, s) => (!best || (byDuration ? s.reps > best.reps : s.weight > best.weight) ? s : best), null);
 }
 
 function renderProgressTab() {
@@ -440,13 +450,26 @@ function renderExerciseRecommendations() {
       .sort((a, b) => (a.date < b.date ? 1 : -1));
     if (history.length === 0) return;
     const latest = history[0];
-    const latestTop = topSet(latest.sets.filter((s) => s.exercise === exercise));
+    const latestTop = topSet(latest.sets.filter((s) => s.exercise === exercise), exercise);
     const prior = history[1];
-    const priorTop = prior ? topSet(prior.sets.filter((s) => s.exercise === exercise)) : null;
+    const priorTop = prior ? topSet(prior.sets.filter((s) => s.exercise === exercise), exercise) : null;
+    const timed = isTimedExercise(exercise);
 
     let reco;
     if (!priorTop) {
       reco = { text: "First time logged — building a baseline.", tone: "neutral" };
+    } else if (timed) {
+      if (latestTop.reps > priorTop.reps) {
+        reco = { text: `Hold improved (${priorTop.reps}s → ${latestTop.reps}s). Keep pushing duration, or add light weight once you clear ~60-90s.`, tone: "good" };
+      } else if (latestTop.reps < priorTop.reps) {
+        const phaseNote =
+          latest.cyclePhase === "luteal" || latest.cyclePhase === "menstrual"
+            ? ` Logged during ${latest.cyclePhase} phase — this may be phase-related rather than a regression.`
+            : "";
+        reco = { text: `Hold dropped (${priorTop.reps}s → ${latestTop.reps}s).${phaseNote} Repeat this duration next session before pushing further.`, tone: phaseNote ? "phase" : "watch" };
+      } else {
+        reco = { text: `Steady at ${latestTop.reps}s. Aim to add a few seconds next session.`, tone: "neutral" };
+      }
     } else if (latestTop.weight > priorTop.weight) {
       reco = { text: `Already progressed vs last time (${priorTop.weight}${priorTop.unit} → ${latestTop.weight}${latestTop.unit}). Keep the current jump size if it felt solid.`, tone: "good" };
     } else if (latestTop.weight === priorTop.weight && latestTop.reps >= priorTop.reps && latestTop.partialReps === 0) {

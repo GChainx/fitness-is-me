@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>SETLOG</title>
+<title>fitnessisme</title>
 <link rel="stylesheet" href="css/styles.css" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -13,7 +13,7 @@
   <!-- ============ AUTH SCREEN ============ -->
   <div id="auth-screen" class="auth-screen">
     <div class="auth-card">
-      <div class="wordmark">SET<span class="accent">LOG</span></div>
+      <div class="wordmark">fitness<span class="accent">isme</span></div>
       <p class="tagline">Lifting, tracked. Muscles, mapped.</p>
       <button id="sign-in-btn" class="btn primary">Sign in with Google</button>
       <p class="muted small">Your data syncs privately to your account only.</p>
@@ -24,7 +24,7 @@
   <div id="app-shell" class="app-shell hidden">
 
     <header class="app-header">
-      <div class="wordmark small">SET<span class="accent">LOG</span></div>
+      <div class="wordmark small">fitness<span class="accent">isme</span></div>
       <div class="header-right">
         <span id="user-email" class="muted small"></span>
         <button id="sign-out-btn" class="icon-btn" aria-label="Sign out">⎋</button>
@@ -66,10 +66,10 @@
               </div>
             </div>
             <div>
-              <label class="field-label">Reps</label>
+              <label class="field-label" id="reps-label">Reps</label>
               <input type="number" id="reps-input" class="field" min="0" />
             </div>
-            <div>
+            <div id="partial-input-group">
               <label class="field-label">Partial reps</label>
               <input type="number" id="partial-input" class="field" min="0" placeholder="0" />
             </div>

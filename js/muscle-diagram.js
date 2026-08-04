@@ -3,7 +3,7 @@
 // renderMuscleDiagram(el, intensityMap) draws it; intensityMap is
 // { muscle_id: 0..1 } where 0 = not worked, 1 = maximally worked.
 // ---------------------------------------------------------------------------
- 
+
 const BODY_OUTLINE = `
   <ellipse cx="100" cy="26" rx="17" ry="20" class="sl-part" />
   <rect x="92" y="42" width="16" height="14" rx="4" class="sl-part" />
@@ -19,7 +19,7 @@ const BODY_OUTLINE = `
   <ellipse cx="78" cy="374" rx="12" ry="7" class="sl-part" />
   <ellipse cx="122" cy="374" rx="12" ry="7" class="sl-part" />
 `;
- 
+
 const FRONT_MUSCLES = {
   front_delts:   `<circle cx="52" cy="64" r="13" /><circle cx="148" cy="64" r="13" />`,
   side_delts:    `<circle cx="34" cy="68" r="10" /><circle cx="166" cy="68" r="10" />`,
@@ -32,7 +32,7 @@ const FRONT_MUSCLES = {
   hip_adductors: `<rect x="93" y="192" width="14" height="70" rx="7" />`,
   hip_abductors: `<rect x="57" y="188" width="13" height="80" rx="6" /><rect x="130" y="188" width="13" height="80" rx="6" />`,
 };
- 
+
 const BACK_MUSCLES = {
   traps:         `<path d="M78,44 Q100,36 122,44 L114,86 Q100,92 86,86 Z" />`,
   side_delts:    `<circle cx="34" cy="68" r="10" /><circle cx="166" cy="68" r="10" />`,
@@ -46,7 +46,7 @@ const BACK_MUSCLES = {
   hamstrings:    `<rect x="70" y="216" width="22" height="82" rx="10" /><rect x="108" y="216" width="22" height="82" rx="10" />`,
   calves:        `<rect x="70" y="282" width="20" height="78" rx="9" /><rect x="110" y="282" width="20" height="78" rx="9" />`,
 };
- 
+
 function heatColor(intensity) {
   // 0 -> inactive gray, 1 -> hot, saturated red-orange
   if (intensity <= 0) return { fill: "var(--muscle-off)", opacity: 1 };
@@ -56,7 +56,7 @@ function heatColor(intensity) {
   const light = 62 - clamped * 24;    // 62% (washed out) -> 38% (rich/dark)
   return { fill: `hsl(${hue}, ${sat}%, ${light}%)`, opacity: 0.4 + clamped * 0.6 };
 }
- 
+
 function buildSilhouette(muscleShapes, intensityMap, idPrefix) {
   let groups = "";
   for (const [id, shapeMarkup] of Object.entries(muscleShapes)) {
@@ -66,7 +66,7 @@ function buildSilhouette(muscleShapes, intensityMap, idPrefix) {
   }
   return `<svg viewBox="0 0 200 380" class="body-svg" id="${idPrefix}">${BODY_OUTLINE}${groups}</svg>`;
 }
- 
+
 function renderMuscleDiagram(container, intensityMap) {
   intensityMap = intensityMap || {};
   container.innerHTML = `
@@ -81,7 +81,7 @@ function renderMuscleDiagram(container, intensityMap) {
       </div>
     </div>
   `;
- 
+
   // simple tooltip on hover/focus
   container.querySelectorAll(".muscle-shape").forEach((g) => {
     const id = g.dataset.muscle;
@@ -90,7 +90,7 @@ function renderMuscleDiagram(container, intensityMap) {
     g.addEventListener("mouseleave", hideMuscleTooltip);
   });
 }
- 
+
 function showMuscleTooltip(e, label, pct) {
   let tip = document.getElementById("muscle-tooltip");
   if (!tip) {
@@ -105,47 +105,56 @@ function showMuscleTooltip(e, label, pct) {
   tip.style.left = rect.left + rect.width / 2 + "px";
   tip.style.top = rect.top - 8 + "px";
 }
- 
+
 function hideMuscleTooltip() {
   const tip = document.getElementById("muscle-tooltip");
   if (tip) tip.style.display = "none";
 }
- 
+
 // -----------------------------------------------------------------------
-// Turn a list of sets (this session, or a week's worth) into an intensity
-// map. Each set contributes volume = weight * (reps + partial*0.4) to
-// every muscle it touches (full weight for primary, 0.5x for secondary).
-// Volumes are then normalized 0..1 against the highest-volume muscle so
-// the diagram always shows relative emphasis for that session/week.
+// Turn a list of sets into a heat-map intensity 0..1 per muscle.
+//
+// IMPORTANT: this is based on SET COUNT (fractional: full credit to a
+// primary muscle, half credit to a secondary/assisting one), not on
+// weight x reps ("volume load"/tonnage). Tonnage is explicitly rejected
+// in the hypertrophy literature as a volume metric — it conflates load
+// with rep count and doesn't correlate well with growth, and it would
+// also make leg exercises (which use much heavier absolute loads) look
+// permanently "hotter" than arm/shoulder work regardless of actual
+// effort or emphasis. The field converged on counting hard sets per
+// muscle per week instead (Schoenfeld et al., 2017 dose-response
+// meta-analysis defines volume this way), so the diagram uses the same
+// unit as the weekly set-count targets shown below it.
+//
+// mode: "relative" (default) normalizes against the highest-count
+// muscle in the given set list — good for a single day, where there's
+// no natural cap. "absolute" normalizes against the research-based
+// weekly ceiling (WEEKLY_SET_TARGET.max, 20 sets) — good for the
+// week view, so color is comparable across weeks rather than always
+// self-scaling to whatever you happened to do most of.
 // -----------------------------------------------------------------------
-function computeIntensityMap(sets) {
-  const volumes = {};
-  for (const id of Object.keys(MUSCLE_GROUPS)) volumes[id] = 0;
- 
-  for (const set of sets) {
-    const { primary, secondary } = getMuscleContribution(set.exercise);
-    const effectiveReps = (set.reps || 0) + (set.partialReps || 0) * 0.4;
-    const volume = (set.weight || 0) * effectiveReps;
-    primary.forEach((m) => (volumes[m] += volume));
-    secondary.forEach((m) => (volumes[m] += volume * 0.5));
-  }
- 
-  const max = Math.max(1, ...Object.values(volumes));
+function computeIntensityMap(sets, mode = "relative") {
+  const counts = computeWeeklySetCounts(sets);
   const intensityMap = {};
-  for (const [id, v] of Object.entries(volumes)) intensityMap[id] = v / max;
+  if (mode === "absolute") {
+    for (const [id, c] of Object.entries(counts)) intensityMap[id] = Math.min(1, c / WEEKLY_SET_TARGET.max);
+  } else {
+    const max = Math.max(1, ...Object.values(counts));
+    for (const [id, c] of Object.entries(counts)) intensityMap[id] = c / max;
+  }
   return intensityMap;
 }
- 
+
 function untouchedMusclesThisWeek(intensityMap, threshold = 0.05) {
   return Object.keys(MUSCLE_GROUPS).filter((id) => (intensityMap[id] || 0) <= threshold);
 }
- 
+
 // -----------------------------------------------------------------------
-// Weekly SET COUNT per muscle (not volume-load) — this is the unit the
-// hypertrophy dose-response literature actually uses. A set counts fully
-// toward a muscle it's primary for, and at half-weight ("fractional")
-// toward a muscle it's secondary for, matching the direct/indirect set
-// quantification used in current meta-analyses.
+// Weekly SET COUNT per muscle — the unit the hypertrophy dose-response
+// literature actually uses. A set counts fully toward a muscle it's
+// primary for, and at half-weight ("fractional") toward a muscle it's
+// secondary for, matching the direct/indirect set quantification used in
+// current meta-analyses.
 // -----------------------------------------------------------------------
 function computeWeeklySetCounts(sets) {
   const counts = {};
@@ -157,14 +166,14 @@ function computeWeeklySetCounts(sets) {
   }
   return counts;
 }
- 
+
 // Research-based weekly set target per muscle group for hypertrophy.
 // 10-20 hard sets/week covers the empirically responsive range for most
 // trained lifters (Schoenfeld et al. 2017 dose-response meta-analysis);
 // below ~6 sets/week is a clearly low stimulus, above ~20 shows
 // diminishing and increasingly individual returns.
 const WEEKLY_SET_TARGET = { low: 6, min: 10, max: 20 };
- 
+
 function classifySetCount(count) {
   if (count <= 0) return "none";
   if (count < WEEKLY_SET_TARGET.low) return "low";
@@ -172,4 +181,3 @@ function classifySetCount(count) {
   if (count <= WEEKLY_SET_TARGET.max) return "optimal";
   return "high";
 }
- 
