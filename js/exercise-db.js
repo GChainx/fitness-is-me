@@ -53,26 +53,34 @@ const EXERCISE_DB = {
 
   "Overhead Press":               { type: "compound",   primary: ["front_delts"], secondary: ["side_delts", "triceps", "traps"] },
   "Dumbbell Shoulder Press":      { type: "compound",   primary: ["front_delts"], secondary: ["side_delts", "triceps"] },
-  "Lateral Raise":                { type: "isolation",  primary: ["side_delts"], secondary: [] },
+  "Dumbbell Lateral Raise":       { type: "isolation",  primary: ["side_delts"], secondary: [] },
+  "Cable Lateral Raise":          { type: "isolation",  primary: ["side_delts"], secondary: [] },
   "Front Raise":                  { type: "isolation",  primary: ["front_delts"], secondary: [] },
   "Face Pull":                    { type: "isolation",  primary: ["rear_delts"], secondary: ["traps", "mid_back"] },
-  "Rear Delt Fly":                { type: "isolation",  primary: ["rear_delts"], secondary: ["mid_back"] },
+  "Cable Rear Delt Fly":          { type: "isolation",  primary: ["rear_delts"], secondary: ["mid_back"] },
+  "Dumbbell Rear Delt Fly":       { type: "isolation",  primary: ["rear_delts"], secondary: ["mid_back"] },
+  "Machine Rear Delt Fly":        { type: "isolation",  primary: ["rear_delts"], secondary: ["mid_back"] },
 
   // --- Back (pull) ---
   "Pull-Up":                      { type: "compound",   primary: ["lats"], secondary: ["biceps", "rear_delts"] },
   "Chin-Up":                      { type: "compound",   primary: ["lats", "biceps"], secondary: ["rear_delts"] },
+  "Band-Assisted Pull-Up":        { type: "compound",   primary: ["lats"], secondary: ["biceps", "rear_delts"] },
+  "Band-Assisted Chin-Up":        { type: "compound",   primary: ["lats", "biceps"], secondary: ["rear_delts"] },
   "Lat Pulldown - Wide Overhand":   { type: "compound",  primary: ["lats"], secondary: ["rear_delts", "biceps"] },
   "Lat Pulldown - Close Underhand": { type: "compound",  primary: ["lats", "biceps"], secondary: [] },
   "Lat Pulldown - Neutral Grip":    { type: "compound",  primary: ["lats"], secondary: ["biceps", "forearms"] },
   "Barbell Row - Overhand Grip":    { type: "compound",  primary: ["lats", "mid_back"], secondary: ["rear_delts", "forearms"] },
   "Barbell Row - Underhand Grip":   { type: "compound",  primary: ["lats", "biceps"], secondary: ["mid_back", "rear_delts"] },
   "Dumbbell Row":                 { type: "compound",   primary: ["lats", "mid_back"], secondary: ["biceps", "rear_delts"] },
-  "Seated Cable Row":             { type: "compound",   primary: ["mid_back", "lats"], secondary: ["biceps"] },
+  "Seated Cable Row - Wide Overhand":   { type: "compound", primary: ["mid_back", "lats"], secondary: ["rear_delts", "forearms"] },
+  "Seated Cable Row - Close Underhand": { type: "compound", primary: ["mid_back", "lats", "biceps"], secondary: [] },
+  "Seated Cable Row - Neutral Grip":    { type: "compound", primary: ["mid_back", "lats"], secondary: ["biceps"] },
   "Straight-Arm Pulldown":        { type: "isolation",  primary: ["lats"], secondary: [] },
   "Shrug":                        { type: "isolation",  primary: ["traps"], secondary: [] },
   "Conventional Deadlift":        { type: "compound",   primary: ["hamstrings", "glutes", "lower_back"], secondary: ["traps", "forearms"] },
   "Sumo Deadlift":                { type: "compound",   primary: ["glutes", "quads", "hip_adductors"], secondary: ["hamstrings", "lower_back"] },
   "Romanian Deadlift":            { type: "compound",   primary: ["hamstrings", "glutes"], secondary: ["lower_back"] },
+  "Single-Leg Romanian Deadlift": { type: "compound",   primary: ["hamstrings", "glutes"], secondary: ["lower_back", "hip_abductors"] },
   "Back Extension":               { type: "isolation",  primary: ["lower_back"], secondary: ["glutes", "hamstrings"] },
 
   // --- Arms ---
@@ -87,11 +95,13 @@ const EXERCISE_DB = {
   // --- Legs ---
   "Back Squat":                   { type: "compound",   primary: ["quads", "glutes"], secondary: ["hip_adductors", "lower_back"] },
   "Front Squat":                  { type: "compound",   primary: ["quads"], secondary: ["glutes", "abs"] },
-  "Leg Press":                    { type: "compound",   primary: ["quads", "glutes"], secondary: ["hip_adductors"] },
+  "Leg Press - Wide Stance":      { type: "compound",   primary: ["glutes", "hip_adductors"], secondary: ["quads"] },
+  "Leg Press - Narrow Stance":    { type: "compound",   primary: ["quads"], secondary: ["glutes"] },
   "Leg Extension":                { type: "isolation",  primary: ["quads"], secondary: [] },
   "Leg Curl":                     { type: "isolation",  primary: ["hamstrings"], secondary: [] },
   "Walking Lunge":                { type: "compound",   primary: ["quads", "glutes"], secondary: ["hip_adductors"] },
-  "Bulgarian Split Squat":        { type: "compound",   primary: ["quads", "glutes"], secondary: ["hip_adductors"] },
+  "Bulgarian Split Squat - Glute Focus": { type: "compound", primary: ["glutes", "hamstrings"], secondary: ["quads", "hip_adductors"] },
+  "Bulgarian Split Squat - Quad Focus":  { type: "compound", primary: ["quads"], secondary: ["glutes", "hip_adductors"] },
   "Hip Thrust":                   { type: "compound",   primary: ["glutes"], secondary: ["hamstrings"] },
   "Calf Raise":                   { type: "isolation",  primary: ["calves"], secondary: [] },
   "Hip Adduction Machine":        { type: "isolation",  primary: ["hip_adductors"], secondary: [] },
@@ -100,8 +110,12 @@ const EXERCISE_DB = {
   "Cable Kickback":               { type: "isolation",  primary: ["glutes"], secondary: ["hip_abductors"] },
 
   // --- Core ---
-  "Plank":                        { type: "isolation",  primary: ["abs"], secondary: ["obliques"] },
+  // Plank is time-based (isTimed) — the Log tab swaps "Reps" for
+  // "Seconds" and hides the partial-reps field when it's selected, since
+  // a hold doesn't have a meaningful "partial rep".
+  "Plank":                        { type: "isolation",  primary: ["abs"], secondary: ["obliques"], isTimed: true },
   "Crunch":                       { type: "isolation",  primary: ["abs"], secondary: [] },
+  "Cable Crunch":                 { type: "isolation",  primary: ["abs"], secondary: ["obliques"] },
   "Hanging Leg Raise":            { type: "compound",   primary: ["abs"], secondary: ["obliques"] },
   "Russian Twist":                { type: "isolation",  primary: ["obliques"], secondary: ["abs"] },
   "Cable Woodchopper":            { type: "isolation",  primary: ["obliques"], secondary: ["abs"] },
@@ -118,6 +132,11 @@ function getMuscleContribution(exerciseName) {
   const ex = getAllExercises()[exerciseName];
   if (!ex) return { primary: [], secondary: [], type: null };
   return ex;
+}
+
+function isTimedExercise(exerciseName) {
+  const ex = getAllExercises()[exerciseName];
+  return !!(ex && ex.isTimed);
 }
 
 // All exercises (primary) targeting a given muscle, split by type — used to
