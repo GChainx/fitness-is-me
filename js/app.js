@@ -1,14 +1,32 @@
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => Array.from(el.querySelectorAll(sel));
 
-let draftSets = [];
-let draftDate = todayStr();
-let draftEditingId = null; // set only when editing an existing session via Calendar
-let calendarMonth = new Date();
-let calendarSelectedDate = null;
+let calendarEarliestMonday = null;
+let calendarLatestMonday = null;
+let calendarScrolledInitially = false;
+let unmappedQueue = [];
+let pendingModalDone = null;
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function mondayOf(d) {
+  const date = new Date(d);
+  const day = (date.getDay() + 6) % 7; // 0 = Monday
+  date.setDate(date.getDate() - day);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function addDays(d, n) {
+  const date = new Date(d);
+  date.setDate(date.getDate() + n);
+  return date;
+}
+
+function dateStrOf(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function formatSetDetail(s) {
@@ -35,7 +53,6 @@ $("#sign-in-btn").addEventListener("click", () => Store.signIn());
 $("#sign-out-btn").addEventListener("click", () => Store.signOut());
 
 function refreshEverything() {
-  renderLogTab();
   renderCalendarTab();
   renderMusclesTab();
   renderProgressTab();
@@ -54,133 +71,111 @@ $$(".tab-btn").forEach((btn) => {
 });
 
 // ---------------------------------------------------------------------------
-// LOG TAB
+// IMPORT TAB (Hevy CSV)
 // ---------------------------------------------------------------------------
-function renderLogTab() {
-  $("#log-date").value = draftDate;
-  populateExerciseOptions();
-  renderDraftSetsList();
-}
-
-function populateExerciseOptions() {
-  const dl = $("#exercise-list");
-  dl.innerHTML = Object.keys(getAllExercises())
-    .sort()
-    .map((name) => `<option value="${name}"></option>`)
-    .join("");
-}
-
-$("#log-date").addEventListener("change", (e) => {
-  draftDate = e.target.value;
-  draftSets = [];
-  draftEditingId = null;
-  $("#cycle-phase").value = "";
-  renderLogTab();
+$("#import-file").addEventListener("change", () => {
+  $("#import-btn").disabled = !$("#import-file").files.length;
 });
 
-$("#exercise-input").addEventListener("input", (e) => {
-  const timed = isTimedExercise(e.target.value.trim());
-  $("#reps-label").textContent = timed ? "Seconds" : "Reps";
-  $("#partial-input-group").style.display = timed ? "none" : "";
-  if (timed) $("#partial-input").value = "";
-});
+$("#import-btn").addEventListener("click", async () => {
+  const file = $("#import-file").files[0];
+  if (!file) return;
+  $("#import-btn").disabled = true;
+  $("#import-status").innerHTML = `<p class="muted small">Parsing…</p>`;
 
-$("#add-set-btn").addEventListener("click", () => {
-  const exercise = $("#exercise-input").value.trim();
-  const weight = parseFloat($("#weight-input").value);
-  const reps = parseInt($("#reps-input").value, 10);
-  const partialReps = parseInt($("#partial-input").value, 10) || 0;
-  const unit = $("#unit-select").value;
+  const text = await file.text();
+  const { sessionsByDate, exerciseNames, skipped } = parseHevyCsv(text);
+  const dates = Object.keys(sessionsByDate);
 
-  if (!exercise) return alert("Enter an exercise name.");
-  if (isNaN(weight) || isNaN(reps)) return alert("Enter weight and reps.");
-
-  if (!getAllExercises()[exercise]) {
-    if (confirm(`"${exercise}" isn't in the database yet. Add it and tag which muscles it works?`)) {
-      openNewExerciseModal(exercise);
-      return;
-    }
-  }
-
-  draftSets.push({ exercise, weight, reps, partialReps, unit });
-  $("#weight-input").value = "";
-  $("#reps-input").value = "";
-  $("#partial-input").value = "";
-  renderDraftSetsList();
-});
-
-function renderDraftSetsList() {
-  const list = $("#draft-sets-list");
-  if (draftSets.length === 0) {
-    list.innerHTML = `<p class="empty-hint">No sets logged yet for this date.</p>`;
+  if (dates.length === 0) {
+    $("#import-status").innerHTML = `<p class="empty-hint">No usable rows found in that file — make sure it's the "Export Workouts" CSV from Hevy.</p>`;
+    $("#import-btn").disabled = false;
     return;
   }
-  list.innerHTML = draftSets
-    .map(
-      (s, i) => `
-      <div class="set-row">
-        <div class="set-row-main">
-          <strong>${s.exercise}</strong>
-          <span class="set-row-detail">${formatSetDetail(s)}</span>
-        </div>
-        <button class="icon-btn danger" data-remove="${i}" aria-label="Remove set">✕</button>
-      </div>`
-    )
-    .join("");
-  $$("[data-remove]", list).forEach((btn) =>
-    btn.addEventListener("click", () => {
-      draftSets.splice(parseInt(btn.dataset.remove, 10), 1);
-      renderDraftSetsList();
-    })
-  );
-}
 
-$("#save-session-btn").addEventListener("click", async () => {
-  if (draftSets.length === 0) return alert("Add at least one set first.");
-  const cyclePhase = $("#cycle-phase").value;
-
-  if (draftEditingId) {
-    // Explicit edit (came from Calendar -> Edit): replace the session's sets outright.
-    await Store.updateSession(draftEditingId, { date: draftDate, cyclePhase, sets: draftSets, updatedAt: Date.now() });
-  } else {
-    const existing = Store.getSessionByDate(draftDate)[0];
+  // Hevy is authoritative for any date present in the file: replace
+  // whatever this app has stored for that date outright (not merge),
+  // so edits/deletions made in Hevy are reflected on re-import too.
+  for (const date of dates) {
+    const est = estimatePhaseForDate(date, Store.getPeriodStarts());
+    const cyclePhase = est ? est.phase : "";
+    const existing = Store.getSessionByDate(date)[0];
+    const payload = { date, cyclePhase, sets: sessionsByDate[date].sets, updatedAt: Date.now() };
     if (existing) {
-      // Already logged something today - append rather than clobber earlier sets.
-      await Store.updateSession(existing.id, {
-        cyclePhase: cyclePhase || existing.cyclePhase,
-        sets: [...existing.sets, ...draftSets],
-        updatedAt: Date.now(),
-      });
+      await Store.updateSession(existing.id, payload);
     } else {
-      await Store.addSession({ date: draftDate, cyclePhase, sets: draftSets, createdAt: Date.now(), updatedAt: Date.now() });
+      payload.createdAt = Date.now();
+      await Store.addSession(payload);
     }
   }
 
-  // Reset the form for the next entry.
-  draftSets = [];
-  draftEditingId = null;
-  draftDate = todayStr();
-  $("#cycle-phase").value = "";
+  $("#import-status").innerHTML = `<p class="empty-hint">Imported ${dates.length} workout day(s) covering ${exerciseNames.size} exercises${skipped ? ` (${skipped} row(s) skipped)` : ""}.</p>`;
+  $("#import-btn").disabled = false;
+  $("#import-file").value = "";
+
+  unmappedQueue = [...exerciseNames].filter((name) => !getAllExercises()[name]);
+  processUnmappedQueue();
   refreshEverything();
 });
 
-// --- new exercise modal ---
-function openNewExerciseModal(name) {
+function processUnmappedQueue() {
+  const box = $("#unmapped-queue");
+  if (unmappedQueue.length === 0) {
+    box.classList.add("hidden");
+    return;
+  }
+  box.classList.remove("hidden");
+  $("#unmapped-current").innerHTML = `<p>${unmappedQueue.length} left to tag.</p>`;
+  openNewExerciseModal(unmappedQueue[0], () => {
+    unmappedQueue.shift();
+    processUnmappedQueue();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// CYCLE WIDGET (Muscles tab — always reflects today)
+// ---------------------------------------------------------------------------
+function renderCycleBox() {
+  const today = todayStr();
+  const isPeriod = Store.isPeriodStart(today);
+  $("#period-toggle-btn").textContent = isPeriod ? "🩸 Period start logged today (tap to undo)" : "🩸 Log period start today";
+  $("#period-toggle-btn").classList.toggle("active-toggle", isPeriod);
+
+  const est = estimatePhaseForDate(today, Store.getPeriodStarts());
+  $("#cycle-phase-indicator").textContent = est
+    ? `Estimated phase: ${PHASE_LABELS[est.phase]} (cycle day ${est.cycleDay} of ~${est.cycleLength})`
+    : "No period logged yet — log one (any past date, via Calendar) to start estimating cycle phase.";
+}
+
+$("#period-toggle-btn").addEventListener("click", async () => {
+  await Store.togglePeriodStart(todayStr());
+  renderCycleBox();
+  renderCalendarTab();
+});
+
+// --- new/unmapped exercise modal -------------------------------------------
+function openNewExerciseModal(name, onDone) {
   $("#new-ex-name").textContent = name;
   $("#new-ex-modal").classList.remove("hidden");
   $$('input[name="muscle"]', $("#new-ex-modal")).forEach((cb) => (cb.checked = false));
+  $("#new-ex-timed").checked = false;
   $("#new-ex-modal").dataset.pendingName = name;
+  pendingModalDone = onDone || null;
 }
-$("#new-ex-cancel").addEventListener("click", () => $("#new-ex-modal").classList.add("hidden"));
+$("#new-ex-cancel").addEventListener("click", () => {
+  $("#new-ex-modal").classList.add("hidden");
+  if (pendingModalDone) pendingModalDone();
+});
 $("#new-ex-save").addEventListener("click", async () => {
   const name = $("#new-ex-modal").dataset.pendingName;
   const checked = $$('input[name="muscle"]:checked', $("#new-ex-modal")).map((cb) => cb.value);
   const type = $('input[name="ex-type"]:checked', $("#new-ex-modal")).value;
+  const isTimed = $("#new-ex-timed").checked;
   if (checked.length === 0) return alert("Pick at least one muscle.");
-  await Store.addCustomExercise(name, checked, [], type);
+  await Store.addCustomExercise(name, checked, [], type, isTimed);
   $("#new-ex-modal").classList.add("hidden");
-  $("#exercise-input").value = name;
-  populateExerciseOptions();
+  if (pendingModalDone) pendingModalDone();
+  refreshEverything();
 });
 
 // ---------------------------------------------------------------------------
@@ -197,84 +192,114 @@ $("#new-ex-save").addEventListener("click", async () => {
 // CALENDAR TAB
 // ---------------------------------------------------------------------------
 function renderCalendarTab() {
-  const y = calendarMonth.getFullYear();
-  const m = calendarMonth.getMonth();
-  $("#calendar-month-label").textContent = calendarMonth.toLocaleString(undefined, { month: "long", year: "numeric" });
-
-  const firstDay = new Date(y, m, 1);
-  const startOffset = (firstDay.getDay() + 6) % 7; // Monday-first
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-
-  const sessionDates = new Set(Store.getSessions().map((s) => s.date));
-
-  let cells = "";
-  for (let i = 0; i < startOffset; i++) cells += `<div class="cal-cell empty"></div>`;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    const hasSession = sessionDates.has(dateStr);
-    const isToday = dateStr === todayStr();
-    cells += `<button class="cal-cell ${hasSession ? "has-session" : ""} ${isToday ? "is-today" : ""}" data-date="${dateStr}">${d}</button>`;
+  if (!calendarEarliestMonday) {
+    const currentMonday = mondayOf(new Date());
+    calendarEarliestMonday = addDays(currentMonday, -8 * 7);
+    calendarLatestMonday = addDays(currentMonday, 3 * 7);
   }
-  $("#calendar-grid").innerHTML = cells;
-
-  $$(".cal-cell[data-date]", $("#calendar-grid")).forEach((cell) =>
-    cell.addEventListener("click", () => showCalendarDetail(cell.dataset.date))
-  );
+  renderCalendarWeeks();
 }
 
-$("#cal-prev").addEventListener("click", () => {
-  calendarMonth.setMonth(calendarMonth.getMonth() - 1);
-  renderCalendarTab();
+function renderCalendarWeeks() {
+  const sessionDates = new Set(Store.getSessions().map((s) => s.date));
+  const periodDates = new Set(Store.getPeriodStarts());
+  const todayS = todayStr();
+
+  let html = "";
+  let lastMonthLabel = null;
+  for (let monday = calendarEarliestMonday; monday <= calendarLatestMonday; monday = addDays(monday, 7)) {
+    const monthLabel = monday.toLocaleString(undefined, { month: "long", year: "numeric" });
+    if (monthLabel !== lastMonthLabel) {
+      html += `<div class="cal-month-divider">${monthLabel}</div>`;
+      lastMonthLabel = monthLabel;
+    }
+    html += `<div class="cal-week-row">`;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(monday, i);
+      const ds = dateStrOf(d);
+      const classes = [
+        "cal-cell",
+        sessionDates.has(ds) ? "has-session" : "",
+        ds === todayS ? "is-today" : "",
+        periodDates.has(ds) ? "is-period" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      html += `<button class="${classes}" data-date="${ds}">${d.getDate()}</button>`;
+    }
+    html += `</div>`;
+  }
+  $("#calendar-weeks").innerHTML = html;
+
+  $$(".cal-cell[data-date]", $("#calendar-weeks")).forEach((cell) =>
+    cell.addEventListener("click", () => showCalendarDetail(cell.dataset.date))
+  );
+
+  if (!calendarScrolledInitially) {
+    calendarScrolledInitially = true;
+    const todayCell = $(`.cal-cell[data-date="${todayS}"]`, $("#calendar-weeks"));
+    if (todayCell) todayCell.scrollIntoView({ block: "center" });
+  }
+}
+
+$("#cal-load-earlier").addEventListener("click", () => {
+  const container = $("#calendar-scroll");
+  const prevHeight = container.scrollHeight;
+  calendarEarliestMonday = addDays(calendarEarliestMonday, -8 * 7);
+  renderCalendarWeeks();
+  container.scrollTop += container.scrollHeight - prevHeight;
 });
-$("#cal-next").addEventListener("click", () => {
-  calendarMonth.setMonth(calendarMonth.getMonth() + 1);
-  renderCalendarTab();
+
+$("#cal-load-later").addEventListener("click", () => {
+  calendarLatestMonday = addDays(calendarLatestMonday, 8 * 7);
+  renderCalendarWeeks();
 });
 
 function showCalendarDetail(dateStr) {
-  calendarSelectedDate = dateStr;
   const sessions = Store.getSessionByDate(dateStr);
   const detail = $("#calendar-detail");
+  const isPeriod = Store.isPeriodStart(dateStr);
+  const periodBtn = `<button class="btn small" id="toggle-period-here">${isPeriod ? "🩸 Undo period start" : "🩸 Mark period start here"}</button>`;
+
   if (sessions.length === 0) {
-    detail.innerHTML = `<p class="empty-hint">No session on ${dateStr}.</p><button class="btn" id="log-this-day">Log a session here</button>`;
-    $("#log-this-day").addEventListener("click", () => {
-      draftDate = dateStr;
-      draftSets = [];
-      draftEditingId = null;
-      renderLogTab();
-      $('.tab-btn[data-tab="log"]').click();
+    detail.innerHTML = `<p class="empty-hint">No session on ${dateStr}.</p>
+      <div class="detail-actions">
+        ${periodBtn}
+      </div>`;
+    $("#toggle-period-here").addEventListener("click", async () => {
+      await Store.togglePeriodStart(dateStr);
+      renderCalendarWeeks();
+      showCalendarDetail(dateStr);
     });
     return;
   }
   const session = sessions[0];
   const intensity = computeIntensityMap(session.sets);
+  const phase = session.cyclePhase || (estimatePhaseForDate(dateStr, Store.getPeriodStarts()) || {}).phase;
   detail.innerHTML = `
     <div class="detail-header">
       <h3>${dateStr}</h3>
-      ${session.cyclePhase ? `<span class="phase-badge">${session.cyclePhase}</span>` : ""}
+      ${phase ? `<span class="phase-badge">${PHASE_LABELS[phase] || phase}</span>` : ""}
     </div>
     <div id="calendar-diagram"></div>
     <div class="set-list-readonly">
       ${session.sets.map((s) => `<div class="set-row-detail">${s.exercise} — ${formatSetDetail(s)}</div>`).join("")}
     </div>
     <div class="detail-actions">
-      <button class="btn" id="edit-this-day">Edit</button>
       <button class="btn danger" id="delete-this-day">Delete</button>
+      ${periodBtn}
     </div>
   `;
   renderMuscleDiagram($("#calendar-diagram"), intensity);
-  $("#edit-this-day").addEventListener("click", () => {
-    draftDate = dateStr;
-    draftSets = session.sets.map((s) => ({ ...s }));
-    draftEditingId = session.id;
-    renderLogTab();
-    $("#cycle-phase").value = session.cyclePhase || "";
-    $('.tab-btn[data-tab="log"]').click();
-  });
   $("#delete-this-day").addEventListener("click", async () => {
-    if (!confirm("Delete this session?")) return;
+    if (!confirm("Delete this session? (It'll come back on your next Hevy import unless removed there too.)")) return;
     await Store.deleteSession(session.id);
     refreshEverything();
+  });
+  $("#toggle-period-here").addEventListener("click", async () => {
+    await Store.togglePeriodStart(dateStr);
+    renderCalendarWeeks();
+    showCalendarDetail(dateStr);
   });
 }
 
@@ -282,6 +307,7 @@ function showCalendarDetail(dateStr) {
 // MUSCLES TAB
 // ---------------------------------------------------------------------------
 function renderMusclesTab() {
+  renderCycleBox();
   const mode = $('input[name="muscle-range"]:checked').value;
   let sets = [];
   if (mode === "today") {
@@ -352,13 +378,18 @@ $$('input[name="muscle-range"]').forEach((r) => r.addEventListener("change", ren
 // ---------------------------------------------------------------------------
 // PROGRESS TAB — recommendations
 // ---------------------------------------------------------------------------
+function toKgWeight(s) {
+  return s.unit === "lb" ? (s.weight || 0) * 0.453592 : s.weight || 0;
+}
+
 function topSet(sets, exerciseName) {
   const byDuration = exerciseName && isTimedExercise(exerciseName);
-  return sets.reduce((best, s) => (!best || (byDuration ? s.reps > best.reps : s.weight > best.weight) ? s : best), null);
+  return sets.reduce((best, s) => (!best || (byDuration ? s.reps > best.reps : toKgWeight(s) > toKgWeight(best)) ? s : best), null);
 }
 
 function renderProgressTab() {
   renderStrengthChart();
+  renderPhaseStrength();
   renderExerciseRecommendations();
 }
 
@@ -367,7 +398,8 @@ let strengthChartInstance = null;
 
 function estOneRM(set) {
   const effectiveReps = (set.reps || 0) + (set.partialReps || 0) * 0.4;
-  return (set.weight || 0) * (1 + effectiveReps / 30); // Epley formula
+  const weightKg = set.unit === "lb" ? (set.weight || 0) * 0.453592 : set.weight || 0;
+  return weightKg * (1 + effectiveReps / 30); // Epley formula, normalized to kg
 }
 
 function computeStrengthTrend(region) {
@@ -437,6 +469,56 @@ function renderStrengthChart() {
 
 $$('input[name="strength-region"]').forEach((r) => r.addEventListener("change", renderStrengthChart));
 
+// --- Strength by cycle phase -----------------------------------------------
+const PHASE_ORDER = ["menstrual", "follicular", "ovulation", "luteal"];
+
+function renderPhaseStrength() {
+  const periodStarts = Store.getPeriodStarts();
+  const sessions = Store.getSessions();
+  const byPhase = { menstrual: [], follicular: [], ovulation: [], luteal: [] };
+
+  sessions.forEach((session) => {
+    const phase = session.cyclePhase || (estimatePhaseForDate(session.date, periodStarts) || {}).phase;
+    if (!phase || !byPhase[phase]) return;
+
+    const topByExercise = {};
+    session.sets.forEach((set) => {
+      if (isTimedExercise(set.exercise)) return; // holds aren't comparable to load-based e1RM
+      const e1rm = estOneRM(set);
+      if (!topByExercise[set.exercise] || e1rm > topByExercise[set.exercise]) topByExercise[set.exercise] = e1rm;
+    });
+    const values = Object.values(topByExercise);
+    if (values.length === 0) return;
+    byPhase[phase].push(values.reduce((a, b) => a + b, 0) / values.length);
+  });
+
+  const phasesWithData = PHASE_ORDER.filter((p) => byPhase[p].length > 0);
+  if (phasesWithData.length < 2) {
+    $("#phase-strength-list").innerHTML = `<p class="empty-hint">Log period start dates plus a few more sessions across different phases to see this comparison.</p>`;
+    return;
+  }
+
+  const avgByPhase = {};
+  PHASE_ORDER.forEach((p) => {
+    avgByPhase[p] = byPhase[p].length ? byPhase[p].reduce((a, b) => a + b, 0) / byPhase[p].length : 0;
+  });
+  const maxAvg = Math.max(1, ...Object.values(avgByPhase));
+
+  $("#phase-strength-list").innerHTML = `
+    <p class="muted small">Average estimated 1RM (across all exercises) by logged/estimated cycle phase at time of session. Excludes timed holds.</p>
+    ${PHASE_ORDER.map((p) => {
+      const n = byPhase[p].length;
+      const pct = n ? Math.round((avgByPhase[p] / maxAvg) * 100) : 0;
+      return `
+        <div class="phase-bar-row">
+          <span class="phase-bar-label">${PHASE_LABELS[p]}</span>
+          <div class="phase-bar-track"><div class="phase-bar-fill" style="width:${pct}%"></div></div>
+          <span class="phase-bar-value">${n ? Math.round(avgByPhase[p] * 10) / 10 : "—"}${n ? ` (n=${n})` : ""}</span>
+        </div>`;
+    }).join("")}
+  `;
+}
+
 // --- Per-exercise progression recommendations -----------------------------
 function renderExerciseRecommendations() {
   const sessions = Store.getSessions();
@@ -470,11 +552,11 @@ function renderExerciseRecommendations() {
       } else {
         reco = { text: `Steady at ${latestTop.reps}s. Aim to add a few seconds next session.`, tone: "neutral" };
       }
-    } else if (latestTop.weight > priorTop.weight) {
+    } else if (toKgWeight(latestTop) > toKgWeight(priorTop)) {
       reco = { text: `Already progressed vs last time (${priorTop.weight}${priorTop.unit} → ${latestTop.weight}${latestTop.unit}). Keep the current jump size if it felt solid.`, tone: "good" };
-    } else if (latestTop.weight === priorTop.weight && latestTop.reps >= priorTop.reps && latestTop.partialReps === 0) {
+    } else if (toKgWeight(latestTop) === toKgWeight(priorTop) && latestTop.reps >= priorTop.reps && latestTop.partialReps === 0) {
       reco = { text: `Hit ${latestTop.weight}${latestTop.unit} × ${latestTop.reps} clean. Try +2.5kg/+5lb (or +1 rep) next session.`, tone: "good" };
-    } else if (latestTop.weight === priorTop.weight && latestTop.reps < priorTop.reps) {
+    } else if (toKgWeight(latestTop) === toKgWeight(priorTop) && latestTop.reps < priorTop.reps) {
       const phaseNote =
         latest.cyclePhase === "luteal" || latest.cyclePhase === "menstrual"
           ? ` Logged during ${latest.cyclePhase} phase — strength dips here are common and not necessarily a regression. Consider holding weight steady rather than dropping it.`
