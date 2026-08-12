@@ -11,14 +11,14 @@
   --success: #7cd992;
   --danger: #ff6b5e;
   --muscle-off: #3a332c;
- 
+
   --font-display: "Oswald", sans-serif;
   --font-body: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 }
- 
+
 * { box-sizing: border-box; }
- 
+
 html, body {
   margin: 0;
   padding: 0;
@@ -27,11 +27,11 @@ html, body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
- 
+
 .hidden { display: none !important; }
 .muted { color: var(--text-dim); }
 .small { font-size: 0.8rem; }
- 
+
 .wordmark {
   font-family: var(--font-display);
   font-weight: 700;
@@ -41,7 +41,7 @@ html, body {
 }
 .wordmark.small { font-size: 1.3rem; }
 .wordmark .accent { color: var(--accent); }
- 
+
 /* ---------------- AUTH SCREEN ---------------- */
 .auth-screen {
   min-height: 100vh;
@@ -63,7 +63,7 @@ html, body {
   margin: 8px 0 28px;
   font-size: 0.95rem;
 }
- 
+
 /* ---------------- BUTTONS / FIELDS ---------------- */
 .btn {
   font-family: var(--font-body);
@@ -84,7 +84,91 @@ html, body {
 }
 .btn.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
 .btn.full-width { width: 100%; margin-top: 16px; }
- 
+
+#import-status { margin-top: 12px; }
+#unmapped-queue { margin-top: 16px; }
+
+.scan-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+}
+.scan-grid-segmental { grid-template-columns: 1fr 1fr; }
+.scan-field label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-bottom: 3px;
+}
+.scan-field .field { margin-bottom: 4px; }
+.scan-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+}
+
+.cycle-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.btn.small { padding: 8px 12px; font-size: 0.82rem; }
+#period-toggle-btn { width: 100%; }
+#period-toggle-btn.active-toggle { border-color: var(--danger); color: var(--danger); }
+#cycle-phase-indicator { margin: 8px 0 0; }
+
+.history-block {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: -4px 0 12px;
+}
+.history-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 2px 0;
+}
+.history-date { color: var(--text-dim); flex: none; }
+.history-sets { text-align: right; }
+.history-empty { margin: -4px 0 12px; }
+
+.phase-bar-row {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+.phase-bar-track {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  height: 14px;
+  overflow: hidden;
+}
+.phase-bar-fill { height: 100%; background: var(--accent); }
+.phase-bar-value { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); text-align: right; }
+
 .icon-btn {
   background: transparent;
   border: none;
@@ -94,7 +178,7 @@ html, body {
   padding: 6px 10px;
 }
 .icon-btn.danger { color: var(--danger); }
- 
+
 .field {
   width: 100%;
   background: var(--surface-2);
@@ -114,10 +198,10 @@ html, body {
   color: var(--text-dim);
   margin-bottom: 4px;
 }
- 
+
 /* ---------------- APP SHELL ---------------- */
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
- 
+
 .app-header {
   display: flex;
   align-items: center;
@@ -130,7 +214,7 @@ html, body {
   z-index: 5;
 }
 .header-right { display: flex; align-items: center; gap: 8px; }
- 
+
 .tab-content {
   flex: 1;
   padding: 16px 16px 90px;
@@ -138,11 +222,11 @@ html, body {
   width: 100%;
   margin: 0 auto;
 }
- 
+
 .tab-panel { display: none; }
 .tab-panel.active { display: block; animation: fadeIn 0.15s ease; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
- 
+
 .panel-title {
   font-family: var(--font-display);
   font-weight: 600;
@@ -159,7 +243,7 @@ html, body {
   letter-spacing: 0.05em;
   margin: 20px 0 8px;
 }
- 
+
 .bottom-nav {
   position: fixed;
   bottom: 0; left: 0; right: 0;
@@ -183,7 +267,7 @@ html, body {
   border-radius: 8px;
 }
 .tab-btn.active { color: var(--accent); background: rgba(255,90,31,0.1); }
- 
+
 /* ---------------- LOG TAB ---------------- */
 .add-set-card {
   background: var(--surface);
@@ -200,7 +284,7 @@ html, body {
 .weight-input-group { display: flex; gap: 6px; }
 .weight-input-group .field:first-child { flex: 1; }
 .unit-select { width: 62px; flex: none; }
- 
+
 .set-row {
   display: flex;
   align-items: center;
@@ -214,9 +298,8 @@ html, body {
 .set-row-main { display: flex; flex-direction: column; gap: 2px; }
 .set-row-detail { font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-dim); }
 .empty-hint { color: var(--text-dim); font-size: 0.9rem; }
- 
+
 /* ---------------- CALENDAR ---------------- */
-.calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .cal-weekday-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -225,24 +308,51 @@ html, body {
   font-size: 0.75rem;
   margin-bottom: 4px;
 }
-.cal-grid {
+.cal-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  background: var(--surface);
+}
+.cal-month-divider {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-2);
+  text-align: center;
+  margin: 10px 0 6px;
+}
+.cal-week-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
+  margin-bottom: 4px;
 }
 .cal-cell {
   aspect-ratio: 1;
   border-radius: 8px;
   border: 1px solid transparent;
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--text);
   font-family: var(--font-mono);
   font-size: 0.85rem;
   cursor: pointer;
+  position: relative;
 }
-.cal-cell.empty { background: transparent; cursor: default; }
 .cal-cell.has-session { background: rgba(255,90,31,0.18); border-color: var(--accent); font-weight: 600; }
 .cal-cell.is-today { border-color: var(--accent-2); }
+.cal-cell.is-period::after {
+  content: "";
+  position: absolute;
+  bottom: 3px; left: 50%;
+  transform: translateX(-50%);
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--danger);
+}
 .calendar-detail { margin-top: 20px; }
 .detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .phase-badge {
@@ -254,9 +364,9 @@ html, body {
   text-transform: capitalize;
   color: var(--accent-2);
 }
-.detail-actions { display: flex; gap: 8px; margin-top: 12px; }
+.detail-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .set-list-readonly { margin-top: 10px; }
- 
+
 /* ---------------- MUSCLE DIAGRAM ---------------- */
 .diagram-pair {
   display: flex;
@@ -281,7 +391,7 @@ html, body {
   z-index: 50;
   display: none;
 }
- 
+
 .segmented {
   display: flex;
   gap: 8px;
@@ -299,7 +409,7 @@ html, body {
 }
 .segmented input { display: none; }
 .segmented label:has(input:checked) { border-color: var(--accent); color: var(--accent); }
- 
+
 .untouched-block { margin-top: 20px; }
 .region-block { margin-bottom: 18px; }
 .region-header {
@@ -339,7 +449,7 @@ html, body {
 .volume-row.status-building { border-left-color: var(--accent-2); }
 .volume-row.status-optimal { border-left-color: var(--success); }
 .volume-row.status-high { border-left-color: var(--accent-cool); }
- 
+
 /* ---------------- PROGRESS ---------------- */
 .reco-card {
   background: var(--surface);
@@ -354,7 +464,7 @@ html, body {
 .reco-card.tone-phase { border-left-color: var(--accent-cool); }
 .reco-header { display: flex; justify-content: space-between; margin-bottom: 4px; font-family: var(--font-display); }
 .reco-card p { margin: 0; font-size: 0.9rem; color: var(--text); }
- 
+
 .placeholder-block {
   background: var(--surface);
   border: 1px dashed var(--border);
@@ -371,7 +481,7 @@ html, body {
   margin: 10px 0 20px;
   height: 220px;
 }
- 
+
 /* ---------------- MODAL ---------------- */
 .modal {
   position: fixed;
@@ -404,8 +514,7 @@ html, body {
   padding: 6px;
 }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
- 
+
 @media (min-width: 700px) {
   .bottom-nav { max-width: 640px; margin: 0 auto; border-radius: 12px 12px 0 0; left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
 }
- 

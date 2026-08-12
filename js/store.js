@@ -8,6 +8,7 @@ const db = firebase.firestore();
 let currentUser = null;
 let sessionsCache = []; // all of the signed-in user's sessions, newest first
 let periodStartsCache = []; // logged period start dates ("YYYY-MM-DD"), ascending
+let bodyScansCache = []; // Evolt/BIA body composition scans, newest first
 
 const Store = {
   onAuthChange(cb) {
@@ -19,6 +20,7 @@ const Store = {
         sessionsCache = [];
         CUSTOM_EXERCISES = {};
         periodStartsCache = [];
+        bodyScansCache = [];
       }
       cb(user);
     });
@@ -42,10 +44,11 @@ const Store = {
 
   async loadAll() {
     if (!currentUser) return;
-    const [sessionsSnap, exercisesSnap, periodSnap] = await Promise.all([
+    const [sessionsSnap, exercisesSnap, periodSnap, scansSnap] = await Promise.all([
       db.collection("users").doc(currentUser.uid).collection("sessions").orderBy("date", "desc").get(),
       db.collection("users").doc(currentUser.uid).collection("customExercises").get(),
       db.collection("users").doc(currentUser.uid).collection("periodStarts").get(),
+      db.collection("users").doc(currentUser.uid).collection("bodyScans").orderBy("date", "desc").get(),
     ]);
     sessionsCache = sessionsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     CUSTOM_EXERCISES = {};
@@ -53,6 +56,7 @@ const Store = {
       CUSTOM_EXERCISES[d.id] = d.data();
     });
     periodStartsCache = periodSnap.docs.map((d) => d.id).sort();
+    bodyScansCache = scansSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   },
 
   getSessions() {
@@ -130,5 +134,20 @@ const Store = {
       await ref.set({ date: dateStr });
       periodStartsCache = [...periodStartsCache, dateStr].sort();
     }
+  },
+
+  getBodyScans() {
+    return bodyScansCache;
+  },
+
+  async addBodyScan(scan) {
+    const ref = await db.collection("users").doc(currentUser.uid).collection("bodyScans").add(scan);
+    bodyScansCache = [{ id: ref.id, ...scan }, ...bodyScansCache].sort((a, b) => (a.date < b.date ? 1 : -1));
+    return ref.id;
+  },
+
+  async deleteBodyScan(id) {
+    await db.collection("users").doc(currentUser.uid).collection("bodyScans").doc(id).delete();
+    bodyScansCache = bodyScansCache.filter((s) => s.id !== id);
   },
 };

@@ -111,6 +111,74 @@
         <div id="progress-list"></div>
       </section>
 
+      <!-- ---------- BODY SCAN TAB (Evolt/BIA) ---------- -->
+      <section id="tab-scans" class="tab-panel">
+        <h2 class="panel-title">Body composition scans</h2>
+        <p class="muted small">
+          Manual entry, not photo OCR — see note below on why. Numbering
+          matches the Evolt printout so you can copy straight across.
+        </p>
+
+        <div class="add-set-card">
+          <label class="field-label">Scan date (not printed on the scan itself)</label>
+          <input type="date" id="scan-date" class="field" />
+
+          <div class="scan-grid">
+            <div class="scan-field"><label>1. Lean Body Mass (kg)</label><input type="number" step="0.1" id="scan-leanBodyMass" class="field" value="41.4"></div>
+            <div class="scan-field"><label>2. Skeletal Muscle Mass (kg)</label><input type="number" step="0.1" id="scan-skeletalMuscleMass" class="field" value="23.0"></div>
+            <div class="scan-field"><label>3. Protein (kg)</label><input type="number" step="0.1" id="scan-protein" class="field" value="8.6"></div>
+            <div class="scan-field"><label>4. Mineral (kg)</label><input type="number" step="0.1" id="scan-mineral" class="field" value="3.0"></div>
+            <div class="scan-field"><label>5. Total Body Water (kg)</label><input type="number" step="0.1" id="scan-totalBodyWater" class="field" value="29.8"></div>
+            <div class="scan-field"><label>6. Body Fat Mass (kg)</label><input type="number" step="0.1" id="scan-bodyFatMass" class="field" value="11.1"></div>
+            <div class="scan-field"><label>7. Subcutaneous Fat Mass (kg)</label><input type="number" step="0.1" id="scan-subcutaneousFatMass" class="field" value="10.2"></div>
+            <div class="scan-field"><label>8. Visceral Fat Mass (kg)</label><input type="number" step="0.1" id="scan-visceralFatMass" class="field" value="0.9"></div>
+            <div class="scan-field"><label>9. Visceral Fat Area (cm²)</label><input type="number" step="1" id="scan-visceralFatArea" class="field" value="27"></div>
+            <div class="scan-field"><label>10. Total Body Fat (%)</label><input type="number" step="0.1" id="scan-totalBodyFatPercent" class="field" value="21.1"></div>
+            <div class="scan-field"><label>11. Visceral Fat Level</label><input type="number" step="1" id="scan-visceralFatLevel" class="field" value="3"></div>
+            <div class="scan-field"><label>12. Intracellular Fluid (kg)</label><input type="number" step="0.1" id="scan-icf" class="field" value="19.6"></div>
+            <div class="scan-field"><label>13. Extracellular Fluid (kg)</label><input type="number" step="0.1" id="scan-ecf" class="field" value="10.2"></div>
+            <div class="scan-field"><label>14. BMR (kCal)</label><input type="number" step="1" id="scan-bmr" class="field" value="1264"></div>
+            <div class="scan-field"><label>15. TEE (kCal)</label><input type="number" step="1" id="scan-tee" class="field" value="1946"></div>
+            <div class="scan-field"><label>16. Bio Age</label><input type="number" step="1" id="scan-bioAge" class="field" value="28"></div>
+            <div class="scan-field"><label>17. BWI Score (/10)</label><input type="number" step="0.1" id="scan-bwiScore" class="field" value="7.9"></div>
+            <div class="scan-field"><label>19. Abdominal Circumference (cm)</label><input type="number" step="0.1" id="scan-abdominalCircumference" class="field" value="69"></div>
+            <div class="scan-field"><label>20. Waist-to-Hip Ratio</label><input type="number" step="0.01" id="scan-waistToHipRatio" class="field" value="0.73"></div>
+          </div>
+
+          <h3 class="section-label">18. Segmental analysis</h3>
+          <div class="scan-grid scan-grid-segmental">
+            <div class="scan-field"><label>Left Arm — Lean (kg)</label><input type="number" step="0.01" id="scan-leftArmLean" class="field" value="2.02"></div>
+            <div class="scan-field"><label>Left Arm — Fat (kg)</label><input type="number" step="0.01" id="scan-leftArmFat" class="field" value="0.56"></div>
+            <div class="scan-field"><label>Right Arm — Lean (kg)</label><input type="number" step="0.01" id="scan-rightArmLean" class="field" value="1.98"></div>
+            <div class="scan-field"><label>Right Arm — Fat (kg)</label><input type="number" step="0.01" id="scan-rightArmFat" class="field" value="0.62"></div>
+            <div class="scan-field"><label>Torso — Lean (kg)</label><input type="number" step="0.01" id="scan-torsoLean" class="field" value="18.68"></div>
+            <div class="scan-field"><label>Torso — Fat (kg)</label><input type="number" step="0.01" id="scan-torsoFat" class="field" value="5.86"></div>
+            <div class="scan-field"><label>Left Leg — Lean (kg)</label><input type="number" step="0.01" id="scan-leftLegLean" class="field" value="5.95"></div>
+            <div class="scan-field"><label>Left Leg — Fat (kg)</label><input type="number" step="0.01" id="scan-leftLegFat" class="field" value="2.00"></div>
+            <div class="scan-field"><label>Right Leg — Lean (kg)</label><input type="number" step="0.01" id="scan-rightLegLean" class="field" value="6.00"></div>
+            <div class="scan-field"><label>Right Leg — Fat (kg)</label><input type="number" step="0.01" id="scan-rightLegFat" class="field" value="2.07"></div>
+          </div>
+
+          <h3 class="section-label">21-24. Nutrition targets (optional)</h3>
+          <div class="scan-grid">
+            <div class="scan-field"><label>21. Calories min-max (kCal)</label><input type="text" id="scan-calories" class="field" value="2146-2246"></div>
+            <div class="scan-field"><label>22. Protein min-max (g)</label><input type="text" id="scan-proteinG" class="field" value="161-168"></div>
+            <div class="scan-field"><label>23. Carbs min-max (g)</label><input type="text" id="scan-carbsG" class="field" value="241-253"></div>
+            <div class="scan-field"><label>24. Fat min-max (g)</label><input type="text" id="scan-fatG" class="field" value="60-62"></div>
+          </div>
+
+          <button id="save-scan-btn" class="btn primary full-width">Save scan</button>
+        </div>
+
+        <h3 class="section-label">Trend</h3>
+        <select id="scan-metric-select" class="field"></select>
+        <div class="chart-wrap"><canvas id="scan-chart"></canvas></div>
+        <p id="scan-chart-empty" class="empty-hint hidden">Log at least 2 scans to see a trend.</p>
+
+        <h3 class="section-label">History</h3>
+        <div id="scan-history-list"></div>
+      </section>
+
       <!-- ---------- RUNNING TAB (placeholder) ---------- -->
       <section id="tab-running" class="tab-panel">
         <h2 class="panel-title">Running</h2>
@@ -127,6 +195,7 @@
       <button class="tab-btn" data-tab="calendar">Calendar</button>
       <button class="tab-btn" data-tab="muscles">Muscles</button>
       <button class="tab-btn" data-tab="progress">Progress</button>
+      <button class="tab-btn" data-tab="scans">Scans</button>
       <button class="tab-btn" data-tab="running">Running</button>
     </nav>
   </div>

@@ -13,6 +13,21 @@ function toLocalDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const MONTH_ABBR = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+
+// Hevy's CSV export uses "7 Aug 2026, 20:21" — not ISO 8601, and relying on
+// new Date(string) for non-standard formats is implementation-defined
+// behavior (can silently break on different browsers/engines). Parsed
+// explicitly instead. Falls back to new Date() for any other format Hevy
+// might export in a different locale.
+function parseHevyDate(str) {
+  const m = /^(\d{1,2})\s+(\w{3})\s+(\d{4}),\s*(\d{1,2}):(\d{2})/.exec(str || "");
+  if (m && MONTH_ABBR[m[2]] !== undefined) {
+    return new Date(+m[3], MONTH_ABBR[m[2]], +m[1], +m[4], +m[5]);
+  }
+  return new Date(str);
+}
+
 // Hevy exports weight in whichever unit the account is set to display -
 // detect which column is present rather than assuming lbs.
 function detectWeightField(row) {
@@ -40,7 +55,7 @@ function parseHevyCsv(csvText) {
     }
     if ((row.set_type || "").toLowerCase() === "warmup") return;
 
-    const d = new Date(row.start_time);
+    const d = parseHevyDate(row.start_time);
     if (isNaN(d)) {
       skipped++;
       return;

@@ -56,6 +56,7 @@ function refreshEverything() {
   renderCalendarTab();
   renderMusclesTab();
   renderProgressTab();
+  renderScansTab();
 }
 
 // ---------------------------------------------------------------------------
@@ -83,39 +84,49 @@ $("#import-btn").addEventListener("click", async () => {
   $("#import-btn").disabled = true;
   $("#import-status").innerHTML = `<p class="muted small">Parsing…</p>`;
 
-  const text = await file.text();
-  const { sessionsByDate, exerciseNames, skipped } = parseHevyCsv(text);
-  const dates = Object.keys(sessionsByDate);
-
-  if (dates.length === 0) {
-    $("#import-status").innerHTML = `<p class="empty-hint">No usable rows found in that file — make sure it's the "Export Workouts" CSV from Hevy.</p>`;
-    $("#import-btn").disabled = false;
-    return;
-  }
-
-  // Hevy is authoritative for any date present in the file: replace
-  // whatever this app has stored for that date outright (not merge),
-  // so edits/deletions made in Hevy are reflected on re-import too.
-  for (const date of dates) {
-    const est = estimatePhaseForDate(date, Store.getPeriodStarts());
-    const cyclePhase = est ? est.phase : "";
-    const existing = Store.getSessionByDate(date)[0];
-    const payload = { date, cyclePhase, sets: sessionsByDate[date].sets, updatedAt: Date.now() };
-    if (existing) {
-      await Store.updateSession(existing.id, payload);
-    } else {
-      payload.createdAt = Date.now();
-      await Store.addSession(payload);
+  try {
+    if (typeof Papa === "undefined") {
+      throw new Error("CSV parser library didn't load (check your internet connection and reload the page).");
     }
+
+    const text = await file.text();
+    const { sessionsByDate, exerciseNames, skipped } = parseHevyCsv(text);
+    const dates = Object.keys(sessionsByDate);
+
+    if (dates.length === 0) {
+      $("#import-status").innerHTML = `<p class="empty-hint">No usable rows found in that file — make sure it's the "Export Workouts" CSV from Hevy.</p>`;
+      $("#import-btn").disabled = false;
+      return;
+    }
+
+    // Hevy is authoritative for any date present in the file: replace
+    // whatever this app has stored for that date outright (not merge),
+    // so edits/deletions made in Hevy are reflected on re-import too.
+    for (const date of dates) {
+      const est = estimatePhaseForDate(date, Store.getPeriodStarts());
+      const cyclePhase = est ? est.phase : "";
+      const existing = Store.getSessionByDate(date)[0];
+      const payload = { date, cyclePhase, sets: sessionsByDate[date].sets, updatedAt: Date.now() };
+      if (existing) {
+        await Store.updateSession(existing.id, payload);
+      } else {
+        payload.createdAt = Date.now();
+        await Store.addSession(payload);
+      }
+    }
+
+    $("#import-status").innerHTML = `<p class="empty-hint">Imported ${dates.length} workout day(s) covering ${exerciseNames.size} exercises${skipped ? ` (${skipped} row(s) skipped)` : ""}.</p>`;
+    $("#import-file").value = "";
+
+    unmappedQueue = [...exerciseNames].filter((name) => !getAllExercises()[name]);
+    processUnmappedQueue();
+    refreshEverything();
+  } catch (err) {
+    console.error("Import failed:", err);
+    $("#import-status").innerHTML = `<p class="empty-hint" style="color:var(--danger)">Import failed: ${err.message || err}. Check the browser console (F12) for details, or let me know the error.</p>`;
+  } finally {
+    $("#import-btn").disabled = false;
   }
-
-  $("#import-status").innerHTML = `<p class="empty-hint">Imported ${dates.length} workout day(s) covering ${exerciseNames.size} exercises${skipped ? ` (${skipped} row(s) skipped)` : ""}.</p>`;
-  $("#import-btn").disabled = false;
-  $("#import-file").value = "";
-
-  unmappedQueue = [...exerciseNames].filter((name) => !getAllExercises()[name]);
-  processUnmappedQueue();
-  refreshEverything();
 });
 
 function processUnmappedQueue() {
@@ -133,8 +144,126 @@ function processUnmappedQueue() {
 }
 
 // ---------------------------------------------------------------------------
-// CYCLE WIDGET (Muscles tab — always reflects today)
+// BODY SCANS (Evolt/BIA) — manual entry, see index.html note on why not OCR
 // ---------------------------------------------------------------------------
+const SCAN_FIELD_IDS = [
+  "leanBodyMass", "skeletalMuscleMass", "protein", "mineral", "totalBodyWater",
+  "bodyFatMass", "subcutaneousFatMass", "visceralFatMass", "visceralFatArea",
+  "totalBodyFatPercent", "visceralFatLevel", "icf", "ecf", "bmr", "tee",
+  "bioAge", "bwiScore", "abdominalCircumference", "waistToHipRatio",
+  "leftArmLean", "leftArmFat", "rightArmLean", "rightArmFat",
+  "torsoLean", "torsoFat", "leftLegLean", "leftLegFat", "rightLegLean", "rightLegFat",
+];
+const SCAN_TEXT_FIELD_IDS = ["calories", "proteinG", "carbsG", "fatG"];
+
+const BODY_SCAN_METRICS = [
+  { key: "leanBodyMass", label: "Lean Body Mass", unit: "kg" },
+  { key: "skeletalMuscleMass", label: "Skeletal Muscle Mass", unit: "kg" },
+  { key: "bodyFatMass", label: "Body Fat Mass", unit: "kg" },
+  { key: "totalBodyFatPercent", label: "Total Body Fat %", unit: "%" },
+  { key: "visceralFatLevel", label: "Visceral Fat Level", unit: "" },
+  { key: "visceralFatArea", label: "Visceral Fat Area", unit: "cm²" },
+  { key: "bmr", label: "BMR", unit: "kCal" },
+  { key: "tee", label: "TEE", unit: "kCal" },
+  { key: "bioAge", label: "Bio Age", unit: "yrs" },
+  { key: "bwiScore", label: "BWI Score", unit: "/10" },
+  { key: "abdominalCircumference", label: "Abdominal Circumference", unit: "cm" },
+  { key: "waistToHipRatio", label: "Waist-to-Hip Ratio", unit: "" },
+  { key: "totalBodyWater", label: "Total Body Water", unit: "kg" },
+];
+
+$("#save-scan-btn").addEventListener("click", async () => {
+  const date = $("#scan-date").value;
+  if (!date) return alert("Pick the scan date first.");
+
+  const scan = { date, createdAt: Date.now() };
+  SCAN_FIELD_IDS.forEach((key) => {
+    const v = parseFloat($(`#scan-${key}`).value);
+    if (!isNaN(v)) scan[key] = v;
+  });
+  SCAN_TEXT_FIELD_IDS.forEach((key) => {
+    const v = $(`#scan-${key}`).value.trim();
+    if (v) scan[key] = v;
+  });
+
+  await Store.addBodyScan(scan);
+  $("#scan-date").value = "";
+  [...SCAN_FIELD_IDS, ...SCAN_TEXT_FIELD_IDS].forEach((key) => ($(`#scan-${key}`).value = ""));
+  renderScansTab();
+});
+
+(function populateScanMetricSelect() {
+  $("#scan-metric-select").innerHTML = BODY_SCAN_METRICS.map((m) => `<option value="${m.key}">${m.label}</option>`).join("");
+})();
+$("#scan-metric-select").addEventListener("change", renderScanChart);
+
+let scanChartInstance = null;
+function renderScanChart() {
+  const metric = BODY_SCAN_METRICS.find((m) => m.key === $("#scan-metric-select").value);
+  const scans = Store.getBodyScans().slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  const points = scans.filter((s) => typeof s[metric.key] === "number");
+
+  $("#scan-chart-empty").classList.toggle("hidden", points.length >= 2);
+  if (points.length < 2) {
+    if (scanChartInstance) scanChartInstance.destroy();
+    scanChartInstance = null;
+    return;
+  }
+
+  const ctx = $("#scan-chart").getContext("2d");
+  if (scanChartInstance) scanChartInstance.destroy();
+  scanChartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: points.map((p) => p.date),
+      datasets: [{
+        label: `${metric.label} (${metric.unit})`,
+        data: points.map((p) => p[metric.key]),
+        borderColor: "#2ec4b6",
+        backgroundColor: "rgba(46,196,182,0.15)",
+        tension: 0.25,
+        fill: true,
+        pointRadius: 3,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#a89f95" }, grid: { color: "#3a332c" } },
+        y: { ticks: { color: "#a89f95" }, grid: { color: "#3a332c" }, title: { display: true, text: metric.unit, color: "#a89f95" } },
+      },
+    },
+  });
+}
+
+function renderScanHistory() {
+  const scans = Store.getBodyScans();
+  $("#scan-history-list").innerHTML =
+    scans.length === 0
+      ? `<p class="empty-hint">No scans logged yet.</p>`
+      : scans
+          .map(
+            (s) => `
+        <div class="scan-history-row">
+          <span>${s.date} — ${s.leanBodyMass ?? "?"}kg lean, ${s.totalBodyFatPercent ?? "?"}% fat</span>
+          <button class="icon-btn danger" data-delete-scan="${s.id}" aria-label="Delete scan">✕</button>
+        </div>`
+          )
+          .join("");
+  $$("[data-delete-scan]", $("#scan-history-list")).forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this scan?")) return;
+      await Store.deleteBodyScan(btn.dataset.deleteScan);
+      renderScansTab();
+    })
+  );
+}
+
+function renderScansTab() {
+  renderScanChart();
+  renderScanHistory();
+}
 function renderCycleBox() {
   const today = todayStr();
   const isPeriod = Store.isPeriodStart(today);
