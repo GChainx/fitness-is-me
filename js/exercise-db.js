@@ -125,7 +125,10 @@ const EXERCISE_DB = {
 let CUSTOM_EXERCISES = {};
 
 function getAllExercises() {
-  return { ...EXERCISE_DB, ...CUSTOM_EXERCISES };
+  // Priority: our hand-curated entries and grip/stance variants win over the
+  // bulk Hevy-derived map on name collision; anything you've tagged yourself
+  // wins over both.
+  return { ...HEVY_EXERCISE_MAP, ...EXERCISE_DB, ...CUSTOM_EXERCISES };
 }
 
 function getMuscleContribution(exerciseName) {
